@@ -1,0 +1,15 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Student Scores Database",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "student_scores",
+      "Username": "postgres",
+      "Password": "postgres123",
+      "SSLMode": "prefer",
+      "Favorite": true
+    }
+  }
+}

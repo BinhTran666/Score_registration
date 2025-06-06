@@ -1,40 +1,57 @@
-const BaseRepository = require('./BaseRepository');
+const logger = require("../utils/logger");
+const BaseRepository = require("./BaseRepository");
 
 class StudentRepository extends BaseRepository {
   constructor() {
-    super('students');
+    super("students");
   }
 
+  async count() {
+    try {
+      const result = await this.db("students").count("id as count").first();
+      return parseInt(result.count) || 0;
+    } catch (error) {
+      logger.error("Error counting students:", error);
+      throw error;
+    }
+  }
   async findBySbd(sbd) {
-    return await this.db(this.tableName)
-      .where('sbd', sbd)
-      .first();
+    return await this.db(this.tableName).where("sbd", sbd).first();
   }
 
   async findBySubjectScore(subject, minScore) {
     return await this.db(this.tableName)
       .whereNotNull(subject)
-      .where(subject, '>=', minScore);
+      .where(subject, ">=", minScore);
   }
 
   async bulkInsert(students) {
-    return await this.db(this.tableName)
-      .insert(students)
-      .onConflict('sbd')
-      .merge();
+    try {
+      if (!students || !Array.isArray(students) || students.length === 0) {
+        throw new Error("No students data provided for bulk insert");
+      }
+
+      // Use Knex batch insert
+      const result = await this.db("students").insert(students);
+      logger.info(`✅ Bulk insert completed: ${students.length} records`);
+      return result;
+    } catch (error) {
+      logger.error("Error in bulk insert:", error);
+      throw error;
+    }
   }
 
   async getScoresBySubject(subject) {
     return await this.db(this.tableName)
-      .select('sbd', subject)
+      .select("sbd", subject)
       .whereNotNull(subject);
   }
 
   async getTopScorers(subject, limit = 10) {
     return await this.db(this.tableName)
-      .select('sbd', subject)
+      .select("sbd", subject)
       .whereNotNull(subject)
-      .orderBy(subject, 'desc')
+      .orderBy(subject, "desc")
       .limit(limit);
   }
 
@@ -53,7 +70,7 @@ class StudentRepository extends BaseRepository {
       average: parseFloat(result.average || 0).toFixed(2),
       maximum: parseFloat(result.maximum || 0),
       minimum: parseFloat(result.minimum || 0),
-      totalStudents: parseInt(result.total_students || 0)
+      totalStudents: parseInt(result.total_students || 0),
     };
   }
 }
