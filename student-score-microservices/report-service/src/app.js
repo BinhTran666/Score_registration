@@ -45,7 +45,7 @@ app.use('/api/reports/groups', groupRoutes);
 async function waitForStudentData() {
   const maxWaitTime = 10 * 60 * 1000; // 10 minutes max
   const checkInterval = 10000; // Check every 10 seconds
-  const minStudents = 800; // Minimum threshold
+  const minStudents = 1000000; // Minimum threshold
   
   const startTime = Date.now();
   let attempt = 1;

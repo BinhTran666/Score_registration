@@ -48,9 +48,9 @@ class StudentPerformanceCalculator {
 
       logger.info(`Getting top ${limit} students for Group ${this.groupConfig.code}`);
 
-      // Build the query
+      // Build the query - only select available columns
       let query = knex('students')
-        .select('sbd', 'ho_ten', 'nam_sinh', 'gioi_tinh', ...this.groupConfig.subjects);
+        .select('sbd', ...this.groupConfig.subjects);
 
       // Add filters to ensure students have valid scores for this group
       if (!includeZeroScores) {
@@ -93,9 +93,6 @@ class StudentPerformanceCalculator {
 
           return {
             sbd: student.sbd,
-            ho_ten: student.ho_ten,
-            nam_sinh: student.nam_sinh,
-            gioi_tinh: student.gioi_tinh,
             weighted_average: Math.round(weightedAverage * 100) / 100,
             subjects: subjectDetails,
             total_score: subjectDetails.reduce((sum, s) => sum + (s.score || 0), 0),
@@ -162,7 +159,8 @@ class StudentPerformanceCalculator {
           total_students: 0,
           average_score: 0,
           max_score: 0,
-          min_score: 0
+          min_score: 0,
+          score_distribution: []
         };
       }
 
@@ -170,8 +168,8 @@ class StudentPerformanceCalculator {
         group: this.groupConfig,
         total_students: eligibleStudents.length,
         average_score: Math.round((weightedAverages.reduce((sum, avg) => sum + avg, 0) / weightedAverages.length) * 100) / 100,
-        max_score: Math.max(...weightedAverages),
-        min_score: Math.min(...weightedAverages),
+        max_score: Math.round(Math.max(...weightedAverages) * 100) / 100,
+        min_score: Math.round(Math.min(...weightedAverages) * 100) / 100,
         score_distribution: this.calculateScoreDistribution(weightedAverages)
       };
 
@@ -198,6 +196,24 @@ class StudentPerformanceCalculator {
         percentage: scores.length > 0 ? Math.round((count / scores.length) * 100 * 100) / 100 : 0
       };
     });
+  }
+
+  // Helper method to check available columns in students table
+  async getAvailableColumns() {
+    try {
+      const knex = require('../database/connection');
+      const result = await knex.raw(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'students' 
+        ORDER BY ordinal_position
+      `);
+      
+      return result.rows.map(row => row.column_name);
+    } catch (error) {
+      logger.error('Error getting available columns:', error);
+      return ['sbd']; // fallback to minimum
+    }
   }
 }
 

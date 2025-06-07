@@ -13,6 +13,7 @@ import {
   Cell,
 } from "recharts";
 import { reportAPI } from "../../services/reportService";
+import TopStudents from "../TopStudents";
 
 function Report() {
   const [chartData, setChartData] = useState(null);
@@ -337,13 +338,13 @@ function Report() {
                               }
                               return `${value} (${percentage}%)`;
                             }}
-                            outerRadius={window.innerWidth < 768 ? 80 : 120}
-                            innerRadius={window.innerWidth < 768 ? 30 : 0}
+                            outerRadius={window.innerWidth < 768 ? 60 : 120}
+                            innerRadius={window.innerWidth < 768 ? 20 : 0}
                             fill="#8884d8"
                             dataKey="value"
                             style={{
                               fontSize:
-                                window.innerWidth < 768 ? "10px" : "12px",
+                                window.innerWidth < 768 ? "8px" : "12px",
                             }}
                           >
                             {preparePieChartData().map((entry, index) => (
@@ -354,9 +355,11 @@ function Report() {
                           <Legend
                             wrapperStyle={{
                               fontSize:
-                                window.innerWidth < 768 ? "10px" : "12px",
-                              paddingTop: "10px",
+                                window.innerWidth < 768 ? "8px" : "12px",
+                              paddingTop:
+                                window.innerWidth < 768 ? "5px" : "10px",
                             }}
+                            iconSize={window.innerWidth < 768 ? 6 : 14}
                           />
                         </PieChart>
                       </ResponsiveContainer>
@@ -399,7 +402,7 @@ function Report() {
             ))}
           </div>
         </div>
-
+        <TopStudents />
         {/* Report Management Section */}
         <div className="bg-white p-6 rounded-xl shadow-lg">
           <h3 className="text-2xl font-bold text-gray-800 mb-4">
