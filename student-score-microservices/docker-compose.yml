@@ -73,6 +73,58 @@ services:
         node --max-old-space-size=${NODE_MAX_MEMORY:-6144} --expose-gc src/app.js
       "
 
+ # Report Service
+  report-service:
+    build:
+      context: ./report-service
+      dockerfile: Dockerfile
+    container_name: ${REPORT_SERVICE_CONTAINER_NAME}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${REPORT_SERVICE_PORT}
+      SERVICE_NAME: report-service
+      DB_HOST: ${DB_HOST}
+      DB_PORT: 5433
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      LOG_LEVEL: ${LOG_LEVEL}
+      ENABLE_CRON: ${REPORT_ENABLE_CRON:-false}
+      REPORT_BATCH_SIZE: ${REPORT_BATCH_SIZE:-1000}
+      CACHE_TTL: ${REPORT_CACHE_TTL:-3600}
+    ports:
+      - "${REPORT_SERVICE_PORT}:${REPORT_SERVICE_PORT}"
+    volumes:
+      - ./report-service/src:/app/src
+      - ./report-service/logs:/app/logs
+    networks:
+      - ${NETWORK_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      student-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "yarn", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    command: >
+      sh -c "
+        echo '📊 Running report service migrations...' &&
+        yarn migrate:latest &&
+        echo '📈 Starting Report Service...' &&
+        yarn start
+      "
+
   # PgAdmin for database management
   pgadmin:
     image: dpage/pgadmin4:8
