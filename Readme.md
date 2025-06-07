@@ -2,6 +2,9 @@
 
 A comprehensive student score management and reporting system built with React frontend and Node.js microservices architecture.
 
+## Youtube Demo Link
+https://youtu.be/6qjdmxi5nkA
+
 ## 🏗️ System Architecture
 
 This project consists of:
@@ -9,7 +12,6 @@ This project consists of:
 - **Student Service**: Node.js microservice for student data management (Port 3001)
 - **Report Service**: Node.js microservice for analytics and reporting (Port 3002)
 - **Database**: PostgreSQL database for data storage
-- **API Gateway**: Central routing for microservices
 
 ## 📋 Prerequisites
 
