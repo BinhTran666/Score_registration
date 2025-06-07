@@ -253,7 +253,6 @@ Score_registration/
 │   │   ├── seeds/
 │   │   └── package.json
 │   │
-│   ├── api-gateway/                   # API Gateway (Optional)
 │   └── docker-compose.yml             # Docker configuration
 ```
 
