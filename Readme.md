@@ -474,39 +474,6 @@ The system includes several optimizations:
 - Environment variable configuration for sensitive data
 - CORS configuration for frontend access
 
-## 🚀 Deployment
-
-### Production Environment
-
-1. **Environment Variables**: Update all `.env` files with production values
-2. **Database**: Set up production PostgreSQL instance
-3. **SSL**: Configure SSL certificates
-4. **Process Manager**: Use PM2 or similar for process management
-5. **Reverse Proxy**: Configure Nginx or Apache
-6. **Monitoring**: Set up logging and monitoring
-
-### Example Production Commands
-
-```bash
-# Install PM2
-npm install -g pm2
-
-# Start services with PM2
-cd student-score-microservices/student-service
-pm2 start app.js --name "student-service"
-
-cd ../report-service
-pm2 start app.js --name "report-service"
-
-# Build frontend for production
-cd ../../frontend
-npm run build
-
-# Serve frontend with a static server
-npm install -g serve
-serve -s dist -l 3000
-```
-
 ## 🤝 Contributing
 
 1. Fork the repository
