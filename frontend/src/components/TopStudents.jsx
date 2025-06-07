@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { reportAPI } from '../services/reportService';
+import MobileStudentCard from './MobileStudentCard';
+import DesktopStudentTable from './DeskTopStudentsTable';
 
 function TopStudents() {
   const [topStudentsData, setTopStudentsData] = useState(null);
@@ -9,6 +11,7 @@ function TopStudents() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [availableGroups, setAvailableGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
+  const [limit, setLimit] = useState(10);
 
   // Handle window resize
   useEffect(() => {
@@ -28,8 +31,9 @@ function TopStudents() {
     if (availableGroups.length > 0) {
       fetchTopStudents();
     }
-  }, [availableGroups]);
+  }, [availableGroups, selectedGroup, limit]);
 
+  // Using your existing reportAPI service
   const fetchGroupsConfig = async () => {
     try {
       setLoadingGroups(true);
@@ -51,12 +55,14 @@ function TopStudents() {
     }
   };
 
+  // Using your existing reportAPI service
   const fetchTopStudents = async (groupCode = selectedGroup) => {
     try {
       setLoadingTopStudents(true);
       setError(null);
-      const result = await reportAPI.getTopStudentsByGroup(groupCode, 10);
+      const result = await reportAPI.getTopStudentsByGroup(groupCode, limit);
       if (result.success) {
+        console.log(result.data);
         setTopStudentsData(result.data);
       } else {
         throw new Error(result.message || 'Failed to fetch top students');
@@ -64,6 +70,7 @@ function TopStudents() {
     } catch (error) {
       console.error('Error fetching top students:', error);
       setError(error.message);
+      setTopStudentsData(null);
     } finally {
       setLoadingTopStudents(false);
     }
@@ -71,101 +78,15 @@ function TopStudents() {
 
   const handleGroupChange = (groupCode) => {
     setSelectedGroup(groupCode);
-    fetchTopStudents(groupCode);
   };
 
-  const MobileStudentCard = ({ student, index }) => (
-    <div className={`p-4 rounded-lg border ${index < 3 ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-200'}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center">
-          {index === 0 && <span className="text-xl mr-2">🥇</span>}
-          {index === 1 && <span className="text-xl mr-2">🥈</span>}
-          {index === 2 && <span className="text-xl mr-2">🥉</span>}
-          <span className="font-bold text-lg">#{student.rank}</span>
-        </div>
-        <span className="font-mono text-blue-600 font-medium">{student.sbd}</span>
-      </div>
-      
-      <div className="mb-3 grid grid-cols-2 gap-4">
-        <div>
-          <span className="text-sm text-gray-600">Total Score: </span>
-          <span className="text-lg font-bold text-green-600">{student.total_score}</span>
-        </div>
-        <div>
-          <span className="text-sm text-gray-600">Average: </span>
-          <span className="text-lg font-bold text-blue-600">{student.average_score}</span>
-        </div>
-      </div>
-      
-      <div className="space-y-2">
-        <span className="text-sm text-gray-600 block">Subject Scores:</span>
-        <div className="grid grid-cols-1 gap-2">
-          {student.subjects.map((subject) => (
-            <div key={subject.code} className="flex justify-between items-center bg-gray-100 rounded px-3 py-2">
-              <span className="text-sm font-medium text-gray-700">{subject.name}</span>
-              <span className="text-sm font-bold text-gray-800">{subject.score}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  const handleLimitChange = (newLimit) => {
+    setLimit(newLimit);
+  };
 
-  const DesktopStudentsTable = () => (
-    <div className="overflow-x-auto">
-      <table className="w-full">
-        <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left py-3 px-2 font-semibold text-gray-700">Rank</th>
-            <th className="text-left py-3 px-2 font-semibold text-gray-700">SBD</th>
-            <th className="text-left py-3 px-2 font-semibold text-gray-700">Total Score</th>
-            <th className="text-left py-3 px-2 font-semibold text-gray-700">Average</th>
-            <th className="text-left py-3 px-2 font-semibold text-gray-700">Subject Scores</th>
-          </tr>
-        </thead>
-        <tbody>
-          {topStudentsData.students.map((student, index) => (
-            <tr key={student.sbd} className={`border-b border-gray-100 ${index < 3 ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
-              <td className="py-4 px-2">
-                <div className="flex items-center">
-                  {index === 0 && <span className="text-2xl mr-2">🥇</span>}
-                  {index === 1 && <span className="text-2xl mr-2">🥈</span>}
-                  {index === 2 && <span className="text-2xl mr-2">🥉</span>}
-                  <span className="font-semibold text-lg">{student.rank}</span>
-                </div>
-              </td>
-              <td className="py-4 px-2">
-                <span className="font-mono text-blue-600 font-medium">{student.sbd}</span>
-              </td>
-              <td className="py-4 px-2">
-                <span className="text-lg font-bold text-green-600">{student.total_score}</span>
-              </td>
-              <td className="py-4 px-2">
-                <span className="text-lg font-bold text-blue-600">{student.average_score}</span>
-              </td>
-              <td className="py-4 px-2">
-                <div className="flex flex-wrap gap-2">
-                  {student.subjects.map((subject) => (
-                    <div 
-                      key={subject.code}
-                      className="flex items-center bg-gray-100 rounded-lg px-3 py-1"
-                    >
-                      <span className="text-xs font-medium text-gray-600 mr-2">
-                        {subject.name}:
-                      </span>
-                      <span className="text-sm font-bold text-gray-800">
-                        {subject.score}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const handleRefresh = () => {
+    fetchTopStudents(selectedGroup);
+  };
 
   const GroupSelector = () => (
     <div className="mt-4 sm:mt-0">
@@ -233,15 +154,39 @@ function TopStudents() {
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
+      {/* Header with controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h3 className="text-2xl font-bold text-gray-800 mb-2">🏆 Top Students</h3>
           <p className="text-gray-600">Highest performing students by total score across examination groups</p>
         </div>
         
-        {/* Group selector */}
-        <GroupSelector />
+        <div className="flex flex-col sm:flex-row gap-4 mt-4 sm:mt-0">
+          {/* Limit selector */}
+          <select
+            value={limit}
+            onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value={5}>Top 5</option>
+            <option value={10}>Top 10</option>
+            <option value={20}>Top 20</option>
+            <option value={50}>Top 50</option>
+          </select>
+          
+          {/* Refresh button */}
+          <button
+            onClick={handleRefresh}
+            disabled={loadingTopStudents}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+          >
+            {loadingTopStudents ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
+
+      {/* Group selector */}
+      <GroupSelector />
 
       {loadingTopStudents ? (
         <div className="flex items-center justify-center h-64">
@@ -292,12 +237,18 @@ function TopStudents() {
               ))}
             </div>
           ) : (
-            <DesktopStudentsTable />
+            <DesktopStudentTable 
+              students={topStudentsData.students} 
+              isLoading={loadingTopStudents}
+            />
           )}
 
           {/* Summary footer */}
           <div className="mt-6 text-center text-sm text-gray-500">
             <p>Generated at: {new Date(topStudentsData.generated_at).toLocaleString()}</p>
+            {topStudentsData.optimization && (
+              <p className="mt-1">Optimization: {topStudentsData.optimization}</p>
+            )}
           </div>
         </div>
       ) : (

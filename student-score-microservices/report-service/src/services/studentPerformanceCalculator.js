@@ -11,7 +11,7 @@ class StudentPerformanceCalculator {
     }
   }
 
-  // Calculate total score for a student in this group 
+  // Calculate total score for a student in this group
   calculateTotalScore(studentScores) {
     const { subjects } = this.groupConfig;
     let totalScore = 0;
@@ -19,7 +19,8 @@ class StudentPerformanceCalculator {
 
     for (const subject of subjects) {
       const score = studentScores[subject];
-      const numericScore = typeof score === "string" ? parseFloat(score) : score;
+      const numericScore =
+        typeof score === "string" ? parseFloat(score) : score;
 
       if (!isNaN(numericScore) && numericScore > 0) {
         totalScore += numericScore;
@@ -39,20 +40,23 @@ class StudentPerformanceCalculator {
     try {
       const { minTotalScore = 15.0 } = options;
 
-      logger.info(`Getting top ${limit} students for Group ${this.groupConfig.code} (Direct SQL)`);
+      logger.info(
+        `Getting top ${limit} students for Group ${this.groupConfig.code} (Direct SQL)`
+      );
 
       const subjects = this.groupConfig.subjects;
-      
-      // Your elegant solution: Simple SQL with ORDER BY sum and LIMIT
+
       const sqlQuery = `
         SELECT 
           sbd,
-          ${subjects.join(', ')},
-          (${subjects.join(' + ')}) as total_score
+          ${subjects.join(", ")},
+          (${subjects.join(" + ")}) as total_score
         FROM students 
-        WHERE ${subjects.map(s => `${s} IS NOT NULL AND ${s} > 0`).join(' AND ')}
-          AND (${subjects.join(' + ')}) >= ${minTotalScore}
-        ORDER BY (${subjects.join(' + ')}) DESC 
+        WHERE ${subjects
+          .map((s) => `${s} IS NOT NULL AND ${s} > 0`)
+          .join(" AND ")}
+          AND (${subjects.join(" + ")}) >= ${minTotalScore}
+        ORDER BY (${subjects.join(" + ")}) DESC 
         LIMIT ${limit}
       `;
 
@@ -71,14 +75,25 @@ class StudentPerformanceCalculator {
 
       // Process the top results (already sorted and limited by database)
       const studentsWithScores = rows.map((student, index) => {
-        const subjectDetails = subjects.map(subjectCode => {
+        const subjectDetails = subjects.map((subjectCode) => {
           const subject = Subjects.getSubject(subjectCode);
-          const score = student[subjectCode];
-          
+          const rawScore = student[subjectCode];
+
+          // FIX: Handle string and number scores correctly
+          let finalScore = 0;
+          if (rawScore !== null && rawScore !== undefined) {
+            if (typeof rawScore === "number") {
+              finalScore = Math.round(rawScore * 100) / 100;
+            } else if (typeof rawScore === "string") {
+              const parsed = parseFloat(rawScore);
+              finalScore = !isNaN(parsed) ? Math.round(parsed * 100) / 100 : 0;
+            }
+          }
+
           return {
             code: subjectCode,
             name: subject ? subject.name : subjectCode,
-            score: typeof score === 'number' ? Math.round(score * 100) / 100 : 0
+            score: finalScore, // Use the properly converted score
           };
         });
 
@@ -90,8 +105,8 @@ class StudentPerformanceCalculator {
           total_score: Math.round(totalScore * 100) / 100,
           average_score: Math.round(averageScore * 100) / 100,
           subjects: subjectDetails,
-          valid_subjects: subjectDetails.filter(s => s.score > 0).length,
-          rank: index + 1
+          valid_subjects: subjectDetails.filter((s) => s.score > 0).length,
+          rank: index + 1,
         };
       });
 
@@ -99,18 +114,22 @@ class StudentPerformanceCalculator {
       const countQuery = `
         SELECT COUNT(*) as total_eligible
         FROM students 
-        WHERE ${subjects.map(s => `${s} IS NOT NULL AND ${s} > 0`).join(' AND ')}
-          AND (${subjects.join(' + ')}) >= ${minTotalScore}
+        WHERE ${subjects
+          .map((s) => `${s} IS NOT NULL AND ${s} > 0`)
+          .join(" AND ")}
+          AND (${subjects.join(" + ")}) >= ${minTotalScore}
       `;
-      
+
       const countResult = await knex.raw(countQuery);
-      const totalEligible = parseInt((countResult.rows || countResult)[0].total_eligible);
+      const totalEligible = parseInt(
+        (countResult.rows || countResult)[0].total_eligible
+      );
 
       return {
         group: this.groupConfig,
         students: studentsWithScores,
         total_eligible: totalEligible,
-        optimization: 'direct-sql',
+        optimization: "direct-sql",
         criteria: {
           min_total_score: minTotalScore,
           min_subjects_required: this.groupConfig.minSubjectsRequired,
@@ -119,9 +138,11 @@ class StudentPerformanceCalculator {
         },
         generated_at: new Date().toISOString(),
       };
-
     } catch (error) {
-      logger.error(`Error getting top students for Group ${this.groupConfig.code}:`, error);
+      logger.error(
+        `Error getting top students for Group ${this.groupConfig.code}:`,
+        error
+      );
       throw new Error(`Failed to get top students: ${error.message}`);
     }
   }
@@ -129,10 +150,12 @@ class StudentPerformanceCalculator {
   // SIMPLE & EFFICIENT: Direct SQL for statistics
   async getGroupStatistics() {
     try {
-      logger.info(`Getting statistics for Group ${this.groupConfig.code} (Direct SQL)`);
+      logger.info(
+        `Getting statistics for Group ${this.groupConfig.code} (Direct SQL)`
+      );
 
       const subjects = this.groupConfig.subjects;
-      const sumFormula = subjects.join(' + ');
+      const sumFormula = subjects.join(" + ");
 
       // Single SQL query with all aggregations
       const statsQuery = `
@@ -146,7 +169,9 @@ class StudentPerformanceCalculator {
           COUNT(CASE WHEN (${sumFormula}) >= 15.0 AND (${sumFormula}) < 18.0 THEN 1 END) as average_count,
           COUNT(CASE WHEN (${sumFormula}) < 15.0 THEN 1 END) as below_avg_count
         FROM students 
-        WHERE ${subjects.map(s => `${s} IS NOT NULL AND ${s} > 0`).join(' AND ')}
+        WHERE ${subjects
+          .map((s) => `${s} IS NOT NULL AND ${s} > 0`)
+          .join(" AND ")}
       `;
 
       const result = await knex.raw(statsQuery);
@@ -160,43 +185,65 @@ class StudentPerformanceCalculator {
           average_total_score: 0,
           max_total_score: 0,
           min_total_score: 0,
-          score_distribution: []
+          score_distribution: [],
         };
       }
 
       return {
         group: this.groupConfig,
         total_students: totalStudents,
-        average_total_score: Math.round(parseFloat(stats.avg_total) * 100) / 100,
+        average_total_score:
+          Math.round(parseFloat(stats.avg_total) * 100) / 100,
         max_total_score: Math.round(parseFloat(stats.max_total) * 100) / 100,
         min_total_score: Math.round(parseFloat(stats.min_total) * 100) / 100,
         score_distribution: [
           {
-            min: 24.0, max: 30.0, label: "Excellent (24.0-30.0)",
+            min: 24.0,
+            max: 30.0,
+            label: "Excellent (24.0-30.0)",
             count: parseInt(stats.excellent_count),
-            percentage: Math.round((parseInt(stats.excellent_count) / totalStudents) * 10000) / 100
+            percentage:
+              Math.round(
+                (parseInt(stats.excellent_count) / totalStudents) * 10000
+              ) / 100,
           },
           {
-            min: 18.0, max: 23.99, label: "Good (18.0-23.99)",
+            min: 18.0,
+            max: 23.99,
+            label: "Good (18.0-23.99)",
             count: parseInt(stats.good_count),
-            percentage: Math.round((parseInt(stats.good_count) / totalStudents) * 10000) / 100
+            percentage:
+              Math.round((parseInt(stats.good_count) / totalStudents) * 10000) /
+              100,
           },
           {
-            min: 15.0, max: 17.99, label: "Average (15.0-17.99)",
+            min: 15.0,
+            max: 17.99,
+            label: "Average (15.0-17.99)",
             count: parseInt(stats.average_count),
-            percentage: Math.round((parseInt(stats.average_count) / totalStudents) * 10000) / 100
+            percentage:
+              Math.round(
+                (parseInt(stats.average_count) / totalStudents) * 10000
+              ) / 100,
           },
           {
-            min: 0, max: 14.99, label: "Below Average (<15.0)",
+            min: 0,
+            max: 14.99,
+            label: "Below Average (<15.0)",
             count: parseInt(stats.below_avg_count),
-            percentage: Math.round((parseInt(stats.below_avg_count) / totalStudents) * 10000) / 100
-          }
+            percentage:
+              Math.round(
+                (parseInt(stats.below_avg_count) / totalStudents) * 10000
+              ) / 100,
+          },
         ],
-        optimization: 'direct-sql'
+        optimization: "direct-sql",
       };
-
     } catch (error) {
-      logger.error(`Error getting Group ${this.groupConfig.code} statistics:`, error);
+      logger.error(
+        `Error getting Group ${this.groupConfig.code} statistics:`,
+        error
+      );
       throw error;
     }
   }
