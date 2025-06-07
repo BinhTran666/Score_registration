@@ -29,6 +29,12 @@ class StudentController {
   async getStudentBySbd(req, res) {
     try {
       const { sbd } = req.params;
+      if (sbd < 0 || isNaN(sbd)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid SBD format. SBD must be a positive number.'
+        });
+      }
       const student = await this.studentService.getStudentBySbd(sbd);
 
       if (!student) {

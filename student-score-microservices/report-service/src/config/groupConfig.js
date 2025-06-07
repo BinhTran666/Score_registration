@@ -1,4 +1,3 @@
-// Group configuration for different combinations
 class GroupConfig {
   static GROUPS = {
     A: {
@@ -6,7 +5,6 @@ class GroupConfig {
       name: 'Group A (Science)',
       description: 'Mathematics, Physics, Chemistry',
       subjects: ['toan', 'vat_li', 'hoa_hoc'],
-      weights: { toan: 2, vat_li: 1, hoa_hoc: 1 }, // Math has double weight
       minSubjectsRequired: 3,
       icon: '🧪',
       color: '#3B82F6'
@@ -16,7 +14,6 @@ class GroupConfig {
       name: 'Group B (Biology)',
       description: 'Mathematics, Chemistry, Biology',
       subjects: ['toan', 'hoa_hoc', 'sinh_hoc'],
-      weights: { toan: 2, hoa_hoc: 1, sinh_hoc: 1 },
       minSubjectsRequired: 3,
       icon: '🌱',
       color: '#10B981'
@@ -26,7 +23,6 @@ class GroupConfig {
       name: 'Group C (Social)',
       description: 'Literature, History, Geography',
       subjects: ['ngu_van', 'lich_su', 'dia_li'],
-      weights: { ngu_van: 2, lich_su: 1, dia_li: 1 },
       minSubjectsRequired: 3,
       icon: '📚',
       color: '#8B5CF6'
@@ -36,7 +32,6 @@ class GroupConfig {
       name: 'Group D (Language)',
       description: 'Mathematics, Literature, Foreign Language',
       subjects: ['toan', 'ngu_van', 'ngoai_ngu'],
-      weights: { toan: 1, ngu_van: 1, ngoai_ngu: 2 },
       minSubjectsRequired: 3,
       icon: '🌍',
       color: '#F59E0B'

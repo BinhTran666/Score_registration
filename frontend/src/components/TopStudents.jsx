@@ -86,9 +86,15 @@ function TopStudents() {
         <span className="font-mono text-blue-600 font-medium">{student.sbd}</span>
       </div>
       
-      <div className="mb-3">
-        <span className="text-sm text-gray-600">Weighted Average: </span>
-        <span className="text-lg font-bold text-green-600">{student.weighted_average}</span>
+      <div className="mb-3 grid grid-cols-2 gap-4">
+        <div>
+          <span className="text-sm text-gray-600">Total Score: </span>
+          <span className="text-lg font-bold text-green-600">{student.total_score}</span>
+        </div>
+        <div>
+          <span className="text-sm text-gray-600">Average: </span>
+          <span className="text-lg font-bold text-blue-600">{student.average_score}</span>
+        </div>
       </div>
       
       <div className="space-y-2">
@@ -97,12 +103,7 @@ function TopStudents() {
           {student.subjects.map((subject) => (
             <div key={subject.code} className="flex justify-between items-center bg-gray-100 rounded px-3 py-2">
               <span className="text-sm font-medium text-gray-700">{subject.name}</span>
-              <div className="flex items-center">
-                <span className="text-sm font-bold text-gray-800">{subject.score}</span>
-                {subject.weight > 1 && (
-                  <span className="text-xs text-blue-600 ml-1">(×{subject.weight})</span>
-                )}
-              </div>
+              <span className="text-sm font-bold text-gray-800">{subject.score}</span>
             </div>
           ))}
         </div>
@@ -117,7 +118,8 @@ function TopStudents() {
           <tr className="border-b border-gray-200">
             <th className="text-left py-3 px-2 font-semibold text-gray-700">Rank</th>
             <th className="text-left py-3 px-2 font-semibold text-gray-700">SBD</th>
-            <th className="text-left py-3 px-2 font-semibold text-gray-700">Weighted Average</th>
+            <th className="text-left py-3 px-2 font-semibold text-gray-700">Total Score</th>
+            <th className="text-left py-3 px-2 font-semibold text-gray-700">Average</th>
             <th className="text-left py-3 px-2 font-semibold text-gray-700">Subject Scores</th>
           </tr>
         </thead>
@@ -136,7 +138,10 @@ function TopStudents() {
                 <span className="font-mono text-blue-600 font-medium">{student.sbd}</span>
               </td>
               <td className="py-4 px-2">
-                <span className="text-lg font-bold text-green-600">{student.weighted_average}</span>
+                <span className="text-lg font-bold text-green-600">{student.total_score}</span>
+              </td>
+              <td className="py-4 px-2">
+                <span className="text-lg font-bold text-blue-600">{student.average_score}</span>
               </td>
               <td className="py-4 px-2">
                 <div className="flex flex-wrap gap-2">
@@ -151,11 +156,6 @@ function TopStudents() {
                       <span className="text-sm font-bold text-gray-800">
                         {subject.score}
                       </span>
-                      {subject.weight > 1 && (
-                        <span className="text-xs text-blue-600 ml-1">
-                          (×{subject.weight})
-                        </span>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -236,7 +236,7 @@ function TopStudents() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h3 className="text-2xl font-bold text-gray-800 mb-2">🏆 Top Students</h3>
-          <p className="text-gray-600">Highest performing students by examination groups</p>
+          <p className="text-gray-600">Highest performing students by total score across examination groups</p>
         </div>
         
         {/* Group selector */}
@@ -263,7 +263,7 @@ function TopStudents() {
                 Total Eligible: {topStudentsData.total_eligible} students
               </span>
               <span className="px-2 py-1 bg-white rounded">
-                Min Score: {topStudentsData.criteria.min_score}
+                Min Total Score: {topStudentsData.criteria.min_total_score}
               </span>
               <span className="px-2 py-1 bg-white rounded">
                 Required Subjects: {topStudentsData.group.minSubjectsRequired || 3}
@@ -271,15 +271,16 @@ function TopStudents() {
             </div>
           </div>
 
-          {/* Weight information */}
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-            <h5 className="text-sm font-semibold text-blue-800 mb-2">Subject Weights:</h5>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(topStudentsData.group.weights || {}).map(([subject, weight]) => (
-                <span key={subject} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                  {subject}: ×{weight}
-                </span>
-              ))}
+          {/* Ranking information */}
+          <div className="mb-4 p-3 bg-green-50 rounded-lg">
+            <h5 className="text-sm font-semibold text-green-800 mb-2">📊 Ranking Criteria:</h5>
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="px-2 py-1 bg-green-100 text-green-800 rounded">
+                Ranked by: Total Score (sum of 3 subjects)
+              </span>
+              <span className="px-2 py-1 bg-green-100 text-green-800 rounded">
+                Order: {topStudentsData.criteria.direction === 'desc' ? 'Highest to Lowest' : 'Lowest to Highest'}
+              </span>
             </div>
           </div>
 

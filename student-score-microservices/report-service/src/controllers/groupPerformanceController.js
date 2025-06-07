@@ -34,7 +34,7 @@ class GroupPerformanceController {
       const {
         limit = 10,
         minScore = 5.0,
-        orderBy = "weighted_average",
+        orderBy = "average_score",
         direction = "desc",
       } = req.query;
 
@@ -183,10 +183,10 @@ class GroupPerformanceController {
 
       const result = await this.groupPerformanceService.getTopStudentsByGroup(
         groupCode,
-        limitNum + offset, // Get more to skip offset
+        limitNum + offset,
         {
           minScore: parseFloat(minScore),
-          orderBy: "weighted_average",
+          orderBy: "average_score", 
           direction: "desc",
         }
       );
@@ -318,13 +318,13 @@ class GroupPerformanceController {
 
     // Competition insights
     if (topStudents.students.length > 0) {
-      const topScore = topStudents.students[0]?.weighted_average;
+      const topScore = topStudents.students[0]?.average_score; 
       if (topScore >= 9.0) {
         insights.push({
           type: "highlight",
           message: "Outstanding top performer with exceptional scores",
           value: topScore,
-          sbd: topStudents.students[0]?.sbd, // Show student ID instead of name
+          sbd: topStudents.students[0]?.sbd,
         });
       }
     }

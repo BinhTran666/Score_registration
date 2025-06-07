@@ -263,7 +263,7 @@ function Report() {
           </div>
 
           {/* Chart Display */}
-          <div className="h-96">
+          <div className="h-100">
             {selectedView === "bar" ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
