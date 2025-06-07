@@ -73,7 +73,7 @@ services:
         node --max-old-space-size=${NODE_MAX_MEMORY:-6144} --expose-gc src/app.js
       "
 
- # Report Service
+  # Report Service
   report-service:
     build:
       context: ./report-service
@@ -91,6 +91,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       LOG_LEVEL: ${LOG_LEVEL}
       ENABLE_CRON: ${REPORT_ENABLE_CRON:-false}
+      AUTO_INITIALIZE: true
       REPORT_BATCH_SIZE: ${REPORT_BATCH_SIZE:-1000}
       CACHE_TTL: ${REPORT_CACHE_TTL:-3600}
     ports:
@@ -98,19 +99,18 @@ services:
     volumes:
       - ./report-service/src:/app/src
       - ./report-service/logs:/app/logs
+      - ./report-service/migrations:/app/migrations
     networks:
       - ${NETWORK_NAME}
     depends_on:
       postgres:
         condition: service_healthy
-      student-service:
-        condition: service_started
     healthcheck:
-      test: ["CMD", "yarn", "health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${REPORT_SERVICE_PORT}/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -121,7 +121,7 @@ services:
       sh -c "
         echo '📊 Running report service migrations...' &&
         yarn migrate:latest &&
-        echo '📈 Starting Report Service...' &&
+        echo '📈 Starting Report Service with smart initialization...' &&
         yarn start
       "
 

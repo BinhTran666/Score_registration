@@ -77,8 +77,8 @@ class SubjectStatistics {
 
   // Initialize default statistics for all subjects and levels
   static async initializeDefaults() {
-    const Subjects = require('../config/Subjects');
-    const ScoreLevels = require('../config/ScoreLevels');
+    const Subjects = require('../config/subjectConfig');
+    const ScoreLevels = require('../config/scoreConfig');
     
     const subjects = Subjects.getAllSubjects();
     const levels = ScoreLevels.getAllLevels();
