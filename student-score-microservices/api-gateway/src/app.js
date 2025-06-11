@@ -6,6 +6,8 @@ require('dotenv').config();
 
 const logger = require('./utils/logger');
 const healthChecker = require('./utils/healthCheck');
+const cacheService = require('./services/cacheService');
+const { createCacheMiddleware, createCacheInvalidationMiddleware } = require('./middleware/cacheMiddleware');
 const { studentServiceProxy, reportServiceProxy, csvServiceProxy } = require('./config/proxyConfig');
 
 const app = express();
@@ -24,7 +26,7 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cache-Control']
 }));
 
 // Body parsing middleware
@@ -35,16 +37,15 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 app.use((req, res, next) => {
   const start = Date.now();
   
-  // Log incoming request
   logger.info('Incoming request', {
     method: req.method,
     url: req.originalUrl,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    contentLength: req.get('Content-Length')
+    contentLength: req.get('Content-Length'),
+    cacheControl: req.get('Cache-Control')
   });
 
-  // Log response when finished
   res.on('finish', () => {
     const duration = Date.now() - start;
     logger.info('Request completed', {
@@ -52,7 +53,8 @@ app.use((req, res, next) => {
       url: req.originalUrl,
       statusCode: res.statusCode,
       duration: `${duration}ms`,
-      contentLength: res.get('Content-Length')
+      contentLength: res.get('Content-Length'),
+      cacheStatus: res.get('X-Cache') || 'NONE'
     });
   });
 
@@ -64,7 +66,10 @@ app.get('/health', async (req, res) => {
   try {
     const serviceStatuses = await healthChecker.checkAllServices();
     const allServicesHealthy = Object.values(serviceStatuses).every(status => status);
-
+    
+    // Check cache health
+    const cacheHealth = await cacheService.healthCheck();
+    
     res.status(allServicesHealthy ? 200 : 503).json({
       status: allServicesHealthy ? 'OK' : 'DEGRADED',
       gateway: 'api-gateway',
@@ -84,6 +89,7 @@ app.get('/health', async (req, res) => {
           lastCheck: healthChecker.getServiceStatus('report-service').lastCheck
         }
       },
+      cache: cacheHealth,
       uptime: process.uptime(),
       memory: process.memoryUsage(),
       environment: process.env.NODE_ENV
@@ -95,6 +101,52 @@ app.get('/health', async (req, res) => {
       message: 'Health check failed',
       error: error.message,
       timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Cache management endpoints
+app.get('/cache/stats', async (req, res) => {
+  try {
+    const stats = await cacheService.getStats();
+    res.json({
+      success: true,
+      cache: stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get cache stats',
+      error: error.message
+    });
+  }
+});
+
+app.delete('/cache/clear', async (req, res) => {
+  try {
+    const { pattern } = req.query;
+    
+    if (pattern) {
+      await cacheService.delPattern(pattern);
+      res.json({
+        success: true,
+        message: `Cache cleared for pattern: ${pattern}`,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      await cacheService.clearReportCache();
+      res.json({
+        success: true,
+        message: 'Report cache cleared',
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear cache',
+      error: error.message
     });
   }
 });
@@ -130,9 +182,23 @@ const checkServiceAvailability = (serviceName) => {
   };
 };
 
-// Proxy routes with service availability checks
-app.use('/api/students', checkServiceAvailability('student-service'), studentServiceProxy);
-app.use('/api/reports', checkServiceAvailability('report-service'), reportServiceProxy);
+// Apply cache middleware to report routes
+const cacheMiddleware = createCacheMiddleware();
+const cacheInvalidationMiddleware = createCacheInvalidationMiddleware();
+
+// Proxy routes with caching
+app.use('/api/students', 
+  checkServiceAvailability('student-service'),
+  createCacheMiddleware(),           // ✅ Add cache middleware
+  createCacheInvalidationMiddleware(), // ✅ Add cache invalidation
+  studentServiceProxy
+);
+app.use('/api/reports', 
+  checkServiceAvailability('report-service'), 
+  cacheMiddleware,
+  cacheInvalidationMiddleware,
+  reportServiceProxy
+);
 app.use('/api/csv', checkServiceAvailability('report-service'), csvServiceProxy);
 
 // API documentation endpoint
@@ -140,17 +206,30 @@ app.get('/api', (req, res) => {
   res.json({
     name: 'Student Score Management API Gateway',
     version: '1.0.0',
-    description: 'API Gateway for Student Score Management System',
+    description: 'API Gateway for Student Score Management System with Redis Caching',
+    features: ['Request Proxying', 'Health Monitoring', 'Redis Caching', 'Error Handling'],
+    cache: {
+      enabled: true,
+      provider: 'Redis',
+      defaultTTL: '5 minutes',
+      management: {
+        stats: 'GET /cache/stats',
+        clear: 'DELETE /cache/clear'
+      }
+    },
     endpoints: {
       gateway: {
         health: 'GET /health - Gateway and services health status',
         status: 'GET /status - Detailed service status information',
-        docs: 'GET /api - This documentation'
+        docs: 'GET /api - This documentation',
+        cacheStats: 'GET /cache/stats - Cache statistics',
+        cacheClear: 'DELETE /cache/clear - Clear cache'
       },
       students: {
         base: '/api/students',
         description: 'Student management operations',
         service: 'student-service',
+        caching: 'No caching applied',
         examples: [
           'GET /api/students - List all students',
           'GET /api/students/:id - Get student by ID',
@@ -163,16 +242,22 @@ app.get('/api', (req, res) => {
         base: '/api/reports',
         description: 'Reporting and analytics operations',
         service: 'report-service',
-        examples: [
-          'GET /api/reports/statistics - Get score statistics',
-          'GET /api/reports/groups/:group - Get group performance',
-          'GET /api/reports/top-students - Get top performing students'
+        caching: 'Redis caching enabled (5-60 minutes TTL)',
+        cached_endpoints: [
+          'GET /api/reports/statistics/chart - Cache: 5 min',
+          'GET /api/reports/statistics/summary - Cache: 5 min',
+          'GET /api/reports/statistics/subject/:code - Cache: 5 min',
+          'GET /api/reports/performance/overview - Cache: 10 min',
+          'GET /api/reports/groups - Cache: 15 min',
+          'GET /api/reports/groups/:group/top-students - Cache: 15 min',
+          'GET /api/reports/config - Cache: 1 hour'
         ]
       },
       csv: {
         base: '/api/csv',
         description: 'CSV data import and export operations',
         service: 'report-service',
+        caching: 'No caching applied (real-time operations)',
         examples: [
           'GET /api/csv/files - List available CSV files',
           'POST /api/csv/process/:filename - Process CSV file',
@@ -196,7 +281,7 @@ app.use('*', (req, res) => {
     success: false,
     message: 'Route not found',
     gateway: 'api-gateway',
-    availableRoutes: ['/health', '/status', '/api', '/api/students/*', '/api/reports/*', '/api/csv/*'],
+    availableRoutes: ['/health', '/status', '/api', '/cache/stats', '/api/students/*', '/api/reports/*', '/api/csv/*'],
     timestamp: new Date().toISOString()
   });
 });
@@ -222,10 +307,11 @@ app.use((err, req, res, next) => {
 
 // Start server and health checking
 app.listen(PORT, () => {
-  logger.info(`🚀 API Gateway running on port ${PORT}`);
+  logger.info(`🚀 API Gateway with Redis Cache running on port ${PORT}`);
   logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
   logger.info(`🔗 Student Service: ${process.env.STUDENT_SERVICE_URL}`);
   logger.info(`📊 Report Service: ${process.env.REPORT_SERVICE_URL}`);
+  logger.info(`🗄️ Redis Cache: ${process.env.REDIS_HOST}:${process.env.REDIS_PORT}`);
   
   // Start periodic health checks
   healthChecker.startPeriodicHealthChecks();
@@ -234,13 +320,15 @@ app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
+  await cacheService.close();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
+  await cacheService.close();
   process.exit(0);
 });
 
