@@ -3,10 +3,22 @@ const ScoreLevels = require('../src/config/scoreConfig');
 
 exports.seed = async function(knex) {
   try {
+    console.log('🌱 Starting subject statistics seed...');
+    
+    // Check if students table has data
+    const studentCount = await knex('students').count('id as count').first();
+    const totalStudents = parseInt(studentCount.count) || 0;
+    
+    if (totalStudents === 0) {
+      console.log('⚠️ No students found in database. Seeding will create empty statistics structure only.');
+      console.log('💡 Import student data first, then run: npx knex seed:run');
+    } else {
+      console.log(`📊 Found ${totalStudents} students in database`);
+    }
+    
     // Clear existing data
     await knex('subject_statistics').del();
-    
-    console.log('Initializing subject statistics data...');
+    console.log('🗑️ Cleared existing subject statistics');
     
     const subjects = Subjects.getAllSubjects();
     const levels = ScoreLevels.getAllLevels();
@@ -33,21 +45,27 @@ exports.seed = async function(knex) {
     
     // Insert all default records
     await knex('subject_statistics').insert(statisticsData);
+    console.log(`✅ Inserted ${statisticsData.length} default statistics records`);
+    console.log(`📋 ${subjects.length} subjects × ${levels.length} levels = ${statisticsData.length} records`);
     
-    console.log(`Inserted ${statisticsData.length} default statistics records`);
-    console.log(`${subjects.length} subjects × ${levels.length} levels = ${statisticsData.length} records`);
-    
-    // Calculate initial statistics from students table
-    console.log('Calculating initial statistics from students data...');
-    
-    for (const subject of subjects) {
-      await calculateSubjectStatistics(knex, subject);
+    // Only calculate statistics if we have student data
+    if (totalStudents > 0) {
+      console.log('📊 Calculating statistics from student data...');
+      
+      for (const subject of subjects) {
+        await calculateSubjectStatistics(knex, subject);
+      }
+      
+      console.log('✅ Subject statistics calculation completed!');
+    } else {
+      console.log('⏭️ Skipping statistics calculation (no student data)');
+      console.log('🔄 Statistics will be calculated automatically when student data is imported');
     }
     
-    console.log('Subject statistics initialization completed successfully!');
+    console.log('🎉 Subject statistics seed completed successfully!');
     
   } catch (error) {
-    console.error('Error initializing subject statistics:', error);
+    console.error('❌ Error in subject statistics seed:', error);
     throw error;
   }
 };
@@ -55,7 +73,7 @@ exports.seed = async function(knex) {
 // Calculate statistics for a specific subject
 async function calculateSubjectStatistics(knex, subject) {
   try {
-    console.log(`Calculating statistics for ${subject.name} (${subject.code})...`);
+    console.log(`  📈 Calculating ${subject.name} (${subject.code})...`);
     
     // Get total students with valid scores for this subject
     const totalResult = await knex('students')
@@ -67,7 +85,7 @@ async function calculateSubjectStatistics(knex, subject) {
     const totalStudents = parseInt(totalResult.count) || 0;
     
     if (totalStudents === 0) {
-      console.log(`  No students found for ${subject.code}`);
+      console.log(`    ⚠️ No valid scores found for ${subject.code}`);
       return;
     }
     
@@ -103,13 +121,15 @@ async function calculateSubjectStatistics(knex, subject) {
           updated_at: new Date()
         });
       
-      console.log(`  ${level.name}: ${levelCount} students (${percentage.toFixed(2)}%)`);
+      if (levelCount > 0) {
+        console.log(`    📊 ${level.name}: ${levelCount} students (${percentage.toFixed(2)}%)`);
+      }
     }
     
-    console.log(`  Total: ${totalStudents} students for ${subject.name}`);
+    console.log(`    ✅ ${subject.name}: ${totalStudents} total students`);
     
   } catch (error) {
-    console.error(`Error calculating statistics for ${subject.code}:`, error);
+    console.error(`❌ Error calculating statistics for ${subject.code}:`, error);
     throw error;
   }
 }
