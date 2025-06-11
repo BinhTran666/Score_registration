@@ -1,142 +1,172 @@
 const express = require('express');
 const cors = require('cors');
-const cron = require('node-cron');
 require('dotenv').config();
 
 const logger = require('./utils/logger');
+
+// Import routes
 const reportRoutes = require('./routes/reportRoutes');
 const groupRoutes = require('./routes/groupRoutes');
+const csvRoutes = require('./routes/CsvRoute');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 
-// Global state
-global.reportServiceInitialized = false;
-global.initializationInProgress = false;
-
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: process.env.MAX_FILE_SIZE || '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.MAX_FILE_SIZE || '100mb' }));
 
-// Health check
+// Health check endpoint
 app.get('/health', (req, res) => {
+  const testMode = process.env.CSV_TEST_MODE === 'true';
+  const testLines = parseInt(process.env.CSV_TEST_LINES) || 10000;
+  
   res.json({
     status: 'OK',
     service: 'report-service',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
-    initialized: global.reportServiceInitialized,
-    initialization_in_progress: global.initializationInProgress,
+    database: {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      database: process.env.DB_NAME
+    },
+    testMode: {
+      enabled: testMode,
+      maxLines: testMode ? testLines : null
+    },
     features: [
-      'Subject Statistics (4 Score Levels)',
-      'Chart Data Generation', 
-      'Performance Analytics by Category'
-    ],
-    database: 'Connected'
+      'Statistical Analysis',
+      'Group Performance Calculation',
+      'CSV Data Import',
+      'Performance Rankings',
+      'Subject Statistics'
+    ]
   });
 });
 
-// API Routes
+// Routes
 app.use('/api/reports', reportRoutes);
 app.use('/api/reports/groups', groupRoutes);
+app.use('/api/csv', csvRoutes);
 
-// SIMPLIFIED WAITING FOR STUDENT DATA
-async function waitForStudentData() {
-  const maxWaitTime = 10 * 60 * 1000; // 10 minutes max
-  const checkInterval = 10000; // Check every 10 seconds
-  const minStudents = 1000000; // Minimum threshold
-  
-  const startTime = Date.now();
-  let attempt = 1;
-  
-  logger.info('🔍 Waiting for student data to be available...');
-  
-  while (Date.now() - startTime < maxWaitTime) {
-    try {
-      const knex = require('./database/connection');
-      
-      // Check if students table exists
-      const studentsTableExists = await knex.schema.hasTable('students');
-      if (!studentsTableExists) {
-        logger.info(`⏳ Attempt ${attempt}: Students table does not exist yet...`);
-        await sleep(checkInterval);
-        attempt++;
-        continue;
-      }
-      
-      // Check total student count - simple check only
-      const studentCountResult = await knex('students').count('* as count').first();
-      const totalStudents = parseInt(studentCountResult.count);
-      
-      if (totalStudents >= minStudents) {
-        logger.info(`✅ Student data ready! Found ${totalStudents} students`);
-        return {
-          ready: true,
-          totalStudents,
-          waitTime: Date.now() - startTime
-        };
-      }
-      
-      logger.info(`⏳ Attempt ${attempt}: Found ${totalStudents} students, waiting for at least ${minStudents}...`);
-      
-    } catch (error) {
-      logger.warn(`⚠️ Attempt ${attempt}: Database check failed: ${error.message}`);
-    }
-    
-    await sleep(checkInterval);
-    attempt++;
-  }
-  
-  // Timeout reached - proceed with whatever data we have
-  logger.warn(`⚠️ Timeout reached after ${maxWaitTime/1000}s. Proceeding with available data...`);
-  return {
-    ready: false,
-    timeout: true,
-    waitTime: maxWaitTime
-  };
-}
+// Error handling middleware
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    service: 'report-service'
+  });
+});
 
-// SAFE AUTO-INITIALIZATION
+// Global initialization flags
+global.reportServiceInitialized = false;
+global.initializationInProgress = false;
+
+// Auto-initialization function
 async function safeAutoInitialize() {
   if (global.initializationInProgress) {
-    logger.info('⏭️ Initialization already in progress, skipping...');
+    logger.info('🔄 Initialization already in progress, skipping...');
     return;
   }
-  
+
   global.initializationInProgress = true;
-  
+
   try {
-    logger.info('🔄 Starting safe auto-initialization...');
+    logger.info('🚀 Starting report service auto-initialization...');
+    logger.info(`📊 Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
     
-    // Step 1: Wait for student data
-    const studentDataStatus = await waitForStudentData();
+    // Show TEST MODE status
+    const testMode = process.env.CSV_TEST_MODE === 'true';
+    const testLines = parseInt(process.env.CSV_TEST_LINES) || 10000;
     
-    // Step 2: Check if statistics already exist and are recent
+    if (testMode) {
+      logger.info(`🧪 TEST MODE ENABLED: Will process only ${testLines} lines from CSV files`);
+    } else {
+      logger.info(`🏭 PRODUCTION MODE: Will process all lines from CSV files`);
+    }
+
+    // Step 1: Test database connection
     const knex = require('./database/connection');
-    const statsCount = await knex('subject_statistics').count('* as count').first();
-    const totalStats = parseInt(statsCount.count);
+    await knex.raw('SELECT 1');
+    logger.info('✅ Database connection successful');
+
+    // Step 2: Check if we have students data
+    const studentsCount = await knex('students').count('id as count').first();
+    const totalStudents = parseInt(studentsCount.count);
+
+    logger.info(`📊 Current students in report database: ${totalStudents}`);
+
+    // Step 3: Auto-import CSV if enabled and no data exists
+    if (process.env.AUTO_IMPORT_CSV === 'true' && totalStudents === 0) {
+      const csvFilename = process.env.CSV_FILENAME || 'diem_thi_thpt_2024.csv';
+      logger.info(`📥 Auto-importing CSV file: ${csvFilename}`);
+      
+      if (testMode) {
+        logger.info(`🧪 TEST MODE: Will import only first ${testLines} records`);
+      }
+      
+      try {
+        const CsvService = require('./services/CsvService');
+        const csvService = new CsvService();
+        
+        // Check if file exists
+        const files = csvService.getAvailableFiles();
+        const targetFile = files.find(f => f.filename === csvFilename);
+        
+        if (!targetFile) {
+          logger.warn(`⚠️ CSV file ${csvFilename} not found in csv-files directory`);
+          logger.info('📋 Available files:', files.map(f => f.filename));
+        } else {
+          logger.info(`📁 Processing CSV file: ${csvFilename} (${targetFile.sizeFormatted})`);
+          const importResult = await csvService.processCSVFile(csvFilename);
+          
+          const modeInfo = importResult.testMode ? ` (TEST MODE - ${importResult.totalProcessed} lines processed)` : '';
+          logger.info(`✅ CSV import completed${modeInfo}: ${importResult.validRecords} valid records, ${importResult.invalidRecords} invalid records`);
+          
+          if (importResult.importResult) {
+            logger.info(`📊 Database import: ${importResult.importResult.inserted} inserted, ${importResult.importResult.updated} updated`);
+          }
+
+          // Update student count after import
+          const newCount = await knex('students').count('id as count').first();
+          logger.info(`📊 Total students after import: ${parseInt(newCount.count)}`);
+        }
+      } catch (csvError) {
+        logger.error('❌ CSV import failed:', csvError.message);
+        // Continue with initialization even if CSV import fails
+      }
+    }
+
+    // Step 4: Check statistics
+    const totalStats = await knex('subject_statistics').count('id as count').first();
     
-    if (totalStats > 0) {
-      // Check if statistics are recent (within last 2 hours)
+    if (parseInt(totalStats.count) > 0) {
       const recentStats = await knex('subject_statistics')
-        .where('calculated_at', '>', knex.raw("NOW() - INTERVAL '2 hours'"))
-        .count('* as count')
+        .count('id as count')
+        .where('calculated_at', '>', knex.raw("NOW() - INTERVAL '1 day'"))
         .first();
       
       if (parseInt(recentStats.count) > 0) {
-        logger.info(`✅ Recent statistics found (${totalStats} records), skipping initialization`);
+        logger.info('📊 Recent statistics found, skipping statistics initialization');
         global.reportServiceInitialized = true;
         global.initializationInProgress = false;
         return;
       }
     }
     
-    // Step 3: Initialize if needed
+    // Step 5: Initialize report system
     logger.info('🔧 Initializing report system...');
     
     const SubjectStatistics = require('./models/SubjectStatistic');
@@ -156,69 +186,43 @@ async function safeAutoInitialize() {
     logger.info('✅ Auto-initialization completed successfully!');
     logger.info(`📊 Processed ${result.subjects_processed} subjects for ${result.total_students} students`);
     
-    return result;
-    
   } catch (error) {
     logger.error('❌ Auto-initialization failed:', error);
     global.reportServiceInitialized = false;
     global.initializationInProgress = false;
-    throw error;
+    
+    // Don't throw error - let service start anyway
+    logger.warn('⚠️ Service will start without full initialization');
   }
 }
 
-// Schedule automatic updates
-if (process.env.ENABLE_CRON === 'true') {
-  cron.schedule('0 */2 * * *', async () => {
-    if (global.reportServiceInitialized && !global.initializationInProgress) {
-      try {
-        logger.info('🔄 Running scheduled statistics update...');
-        const ReportService = require('./services/ReportService');
-        const reportService = new ReportService();
-        await reportService.updateAllStatistics();
-        logger.info('✅ Scheduled statistics update completed');
-      } catch (error) {
-        logger.error('❌ Scheduled statistics update failed:', error);
-      }
-    }
-  });
-}
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  logger.error('Unhandled error:', err);
-  res.status(500).json({
-    success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
-  });
-});
-
-// 404 handler  
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-    service: 'report-service',
-    initialized: global.reportServiceInitialized
-  });
-});
-
 // Start server
-app.listen(PORT, () => {
-  logger.info(`🎯 Report Service running on port ${PORT}`);
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
+app.listen(PORT, async () => {
+  const testMode = process.env.CSV_TEST_MODE === 'true';
+  const testLines = parseInt(process.env.CSV_TEST_LINES) || 10000;
   
-  // Start initialization in background (non-blocking)
-  if (process.env.AUTO_INITIALIZE !== 'false') {
-    logger.info('🔄 Starting background initialization...');
-    setImmediate(() => {
-      safeAutoInitialize().catch(error => {
-        logger.error('Background initialization failed:', error);
-        logger.info('💡 Manual initialization available: POST /api/reports/initialize');
-      });
-    });
+  logger.info(`📊 Report Service running on port ${PORT}`);
+  logger.info(`🌍 Environment: ${process.env.NODE_ENV}`);
+  logger.info(`🗄️ Database: ${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`);
+  
+  // Show TEST MODE status at startup
+  if (testMode) {
+    logger.info(`🧪 TEST MODE: CSV processing limited to ${testLines} lines`);
   } else {
-    logger.info('💡 Auto-initialization disabled. Manual init: POST /api/reports/initialize');
+    logger.info(`🏭 PRODUCTION MODE: Full CSV processing enabled`);
+  }
+  
+  // Auto-initialize if enabled
+  if (process.env.AUTO_INITIALIZE === 'true') {
+    logger.info('🔄 Auto-initialization enabled');
+    // Use setTimeout to prevent blocking the server startup
+    setTimeout(() => {
+      safeAutoInitialize().catch(error => {
+        logger.error('Auto-initialization error:', error);
+      });
+    }, 1000);
+  } else {
+    logger.info('ℹ️ Auto-initialization disabled. Set AUTO_INITIALIZE=true to enable.');
   }
 });
 

@@ -1,184 +1,119 @@
 # Score Registration System
 
-A comprehensive student score management and reporting system built with React frontend and Node.js microservices architecture.
+A comprehensive student score management and reporting system built with React frontend and Node.js microservices architecture with Redis caching and API Gateway.
 
-## Youtube Demo Link
+## Youtube Demo Link Attempt-1
 https://youtu.be/6qjdmxi5nkA
+## Youtube Demo Link Attempt-2
+https://youtu.be/IMHcBeoxMq8
+
+
 
 ## 🏗️ System Architecture
 
 This project consists of:
 - **Frontend**: React application with Vite (Port 3000)
+- **API Gateway**: Centralized gateway with Redis caching (Port 3000)
 - **Student Service**: Node.js microservice for student data management (Port 3001)
 - **Report Service**: Node.js microservice for analytics and reporting (Port 3002)
-- **Database**: PostgreSQL database for data storage
+- **CSV Service**: Node.js microservice for CSV processing (Port 3003)
+- **Redis Cache**: High-performance caching layer (Port 6379)
+- **Database**: PostgreSQL databases for data storage (Student DB: 5432, Report DB: 5433)
+- **PgAdmin**: Database administration interface (Port 8080)
 
 ## 📋 Prerequisites
 
 Before setting up the project, ensure you have the following installed:
 
-- **Node.js** (v18 or higher)
-- **npm** or **yarn**
-- **PostgreSQL** (v12 or higher)
+- **Docker** and **Docker Compose** (Recommended)
+- **Node.js** (v18 or higher) - for local development
 - **Git**
 
-## 🚀 Project Setup
+## 🚀 Quick Start with Docker (Recommended)
 
 ### 1. Clone the Repository
 
 ```bash
 git clone <your-repository-url>
-cd Score_registration
+cd Score_registration/student-score-microservices
 ```
 
-### 2. Database Setup
+### 2. Environment Setup
 
-#### Install and Configure PostgreSQL
-
-1. Install PostgreSQL on your system
-2. Create a new database:
-
-```sql
-CREATE DATABASE scores_student;
-CREATE USER student_user WITH ENCRYPTED PASSWORD 'your_password';
-GRANT ALL PRIVILEGES ON DATABASE scores_student TO student_user;
-```
-
-### 3. Backend Services Setup
-
-#### A. Student Service Setup
-
-```bash
-cd student-score-microservices/student-service
-```
-
-Create `.env` file:
+Create `.env` file in the `student-score-microservices` directory:
 
 ```env
+# Network Configuration
+NETWORK_NAME=student-scores-network
+
 # Database Configuration
-DB_HOST=localhost
-DB_PORT=5433
-DB_NAME=scores_student
-DB_USER=student_user
-DB_PASSWORD=your_password
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=scores_student
+POSTGRES_USER=student_user
+POSTGRES_PASSWORD=student_password
 
-# Service Configuration
-PORT=3001
-NODE_ENV=development
+POSTGRES_REPORT_HOST=postgres-report
+POSTGRES_REPORT_PORT=5432
+POSTGRES_REPORT_DB=scores_report
+POSTGRES_REPORT_USER=report_user
+POSTGRES_REPORT_PASSWORD=report_password
 
-# CSV Import Configuration
+# Service URLs
+STUDENT_SERVICE_URL=http://student-service:3001
+REPORT_SERVICE_URL=http://report-service:3002
+CSV_SERVICE_URL=http://csv-service:3003
+
+# API Gateway Configuration
+API_GATEWAY_PORT=3000
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+
+# Redis Configuration
+REDIS_HOST=redis-cache
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# CSV Configuration
 AUTO_IMPORT_CSV=true
-CSV_FILENAME=students_data.csv
-CSV_STREAM_PROCESSING=true
-CSV_BATCH_SIZE=200
 CSV_TEST_MODE=false
-CSV_TEST_LINES=1000
+CSV_STREAM_PROCESSING=true
+CSV_BATCH_SIZE=500
+MAX_FILE_SIZE=100mb
+ENABLE_CRON=false
 
-# File Upload Limits
-MAX_FILE_SIZE=50mb
+# PgAdmin Configuration
+PGADMIN_EMAIL=admin@admin.com
+PGADMIN_PASSWORD=admin
+PGADMIN_PORT=8080
 
 # Logging
 LOG_LEVEL=info
-```
-
-Install dependencies and setup:
-
-```bash
-npm install
-# or
-yarn install
-
-# Run database migrations
-npx knex migrate:latest
-
-# Run database seeds (optional)
-npx knex seed:run
-
-# Create CSV files directory
-mkdir -p csv-files
-
-# Start the service
-npm start
-# or
-yarn start
-```
-
-#### B. Report Service Setup
-
-```bash
-cd ../report-service
-```
-
-Create `.env` file:
-
-```env
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5433
-DB_NAME=scores_student
-DB_USER=student_user
-DB_PASSWORD=your_password
-
-# Service Configuration
-PORT=3002
 NODE_ENV=development
-
-# Report Configuration
-AUTO_INITIALIZE=true
-
-# Logging
-LOG_LEVEL=info
 ```
 
-Install dependencies and setup:
+### 3. Start All Services
 
 ```bash
-npm install
-# or
-yarn install
+# Build and start all services
+docker-compose up --build -d
 
-# Run database migrations
-npx knex migrate:latest
+# View logs
+docker-compose logs -f
 
-# Run database seeds
-npx knex seed:run
-
-# Start the service
-npm start
-# or
-yarn start
+# View specific service logs
+docker-compose logs -f api-gateway
+docker-compose logs -f report-service
+docker-compose logs -f student-service
 ```
 
-### 4. Frontend Setup
+### 4. Access the Application
 
-```bash
-cd ../../frontend
-```
+- **Frontend**: http://localhost:3000
+- **API Gateway**: http://localhost:3000
+- **PgAdmin**: http://localhost:8080 (admin@admin.com / admin)
+- **Health Check**: http://localhost:3000/health
 
-Install dependencies:
-
-```bash
-npm install
-# or
-yarn install
-```
-
-Create `.env` file (optional):
-
-```env
-VITE_API_BASE_URL=http://localhost:3002
-VITE_STUDENT_API_URL=http://localhost:3001
-```
-
-Start the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-```
-
-## 🗂️ Project Structure
+## 🗂️ Updated Project Structure
 
 ```
 Score_registration/
@@ -197,305 +132,413 @@ Score_registration/
 │   │   │   ├── Sidebar.jsx
 │   │   │   └── TopStudents.jsx
 │   │   ├── services/
-│   │   │   └── ReportService.js       # API service layer
+│   │   │   ├── reportService.js       # API service layer
+│   │   │   └── studentService.js      # Student API service
 │   │   └── App.jsx
 │   ├── package.json
 │   └── vite.config.js
 │
 ├── student-score-microservices/       # Backend Microservices
+│   ├── api-gateway/                   # 🆕 API Gateway with Redis Caching
+│   │   ├── src/
+│   │   │   ├── middleware/
+│   │   │   │   ├── cacheMiddleware.js # Smart caching middleware
+│   │   │   │   └── healthMiddleware.js
+│   │   │   ├── services/
+│   │   │   │   └── cacheService.js    # Redis cache service
+│   │   │   ├── config/
+│   │   │   │   └── proxyConfig.js     # Proxy configurations
+│   │   │   ├── utils/
+│   │   │   │   ├── logger.js
+│   │   │   │   └── healthCheck.js
+│   │   │   └── app.js
+│   │   ├── package.json
+│   │   └── Dockerfile
+│   │
 │   ├── student-service/               # Student Data Management
 │   │   ├── src/
 │   │   │   ├── controllers/
-│   │   │   │   ├── StudentController.js
-│   │   │   │   └── CsvController.js
 │   │   │   ├── services/
-│   │   │   │   ├── StudentService.js
-│   │   │   │   └── CsvService.js
 │   │   │   ├── models/
-│   │   │   │   └── Student.js
 │   │   │   ├── repositories/
-│   │   │   │   ├── BaseRepository.js
-│   │   │   │   └── StudentRepository.js
 │   │   │   ├── routes/
-│   │   │   │   ├── StudentRoute.js
-│   │   │   │   └── CsvRoute.js
 │   │   │   ├── database/
-│   │   │   ├── utils/
-│   │   │   └── app.js
+│   │   │   └── utils/
 │   │   ├── migrations/
 │   │   ├── seeds/
 │   │   ├── csv-files/                 # CSV data files
-│   │   └── package.json
+│   │   ├── package.json
+│   │   └── Dockerfile
 │   │
 │   ├── report-service/                # Analytics & Reporting
 │   │   ├── src/
 │   │   │   ├── controllers/
-│   │   │   │   ├── report.js
-│   │   │   │   └── groupPerformanceController.js
 │   │   │   ├── services/
-│   │   │   │   ├── ReportService.js
-│   │   │   │   ├── studentPerformanceCalculator.js
-│   │   │   │   ├── groupPerformanceService.js
-│   │   │   │   └── statisticCalculatorService.js
 │   │   │   ├── models/
-│   │   │   │   └── SubjectStatistic.js
 │   │   │   ├── config/
-│   │   │   │   ├── groupConfig.js
-│   │   │   │   ├── subjectConfig.js
-│   │   │   │   └── scoreConfig.js
 │   │   │   ├── routes/
-│   │   │   │   ├── reportRoutes.js
-│   │   │   │   └── groupRoutes.js
 │   │   │   ├── database/
-│   │   │   ├── utils/
-│   │   │   └── app.js
+│   │   │   └── utils/
 │   │   ├── migrations/
 │   │   ├── seeds/
-│   │   └── package.json
+│   │   ├── csv-files/                 # 🆕 CSV files for report service
+│   │   ├── package.json
+│   │   └── Dockerfile
 │   │
-│   └── docker-compose.yml             # Docker configuration
+│   ├── csv-service/                   # 🆕 Dedicated CSV Processing Service
+│   │   ├── src/
+│   │   │   ├── controllers/
+│   │   │   ├── services/
+│   │   │   ├── utils/
+│   │   │   └── app.js
+│   │   ├── csv-files/
+│   │   ├── package.json
+│   │   └── Dockerfile
+│   │
+│   ├── docker-compose.yml             # 🆕 Complete Docker orchestration
+│   └── .env                          # Environment configuration
 ```
 
-## 📊 Features
+## 🆕 New Features & Enhancements
 
-### Student Management
-- **CSV Import**: Bulk import student data from CSV files
-- **CRUD Operations**: Create, Read, Update, Delete student records
-- **Score Management**: Manage individual subject scores
-- **Data Validation**: Comprehensive validation for student data
+### API Gateway with Intelligent Caching
+- **Centralized Entry Point**: Single gateway for all API requests
+- **Smart Redis Caching**: Automatic caching with configurable TTL
+- **Cache Invalidation**: Automatic cache clearing on data mutations
+- **Health Monitoring**: Real-time service health checks
+- **Request Routing**: Intelligent routing to appropriate microservices
 
-### Reporting & Analytics
-- **Performance Statistics**: Subject-wise performance analysis
-- **Score Distribution**: Visualize score distributions across subjects
-- **Top Students**: Rank students by performance groups
-- **Group Analysis**: Analyze performance by subject combinations
-- **Interactive Charts**: Bar charts and pie charts for data visualization
-
-### Subject Groups
-- **Group A**: Mathematics, Physics, Chemistry (Science)
-- **Group B**: Mathematics, Chemistry, Biology (Biology)
-- **Group C**: Literature, History, Geography (Social Sciences)
-- **Group D**: Mathematics, Literature, Foreign Language (Language)
-
-## 🔧 Configuration
-
-### Database Schema
-
-The system uses the following main tables:
-
-```sql
--- Students table
-students (
-  id SERIAL PRIMARY KEY,
-  sbd VARCHAR(20) UNIQUE NOT NULL,
-  toan DECIMAL(4,2),
-  ngu_van DECIMAL(4,2),
-  ngoai_ngu DECIMAL(4,2),
-  vat_li DECIMAL(4,2),
-  hoa_hoc DECIMAL(4,2),
-  sinh_hoc DECIMAL(4,2),
-  lich_su DECIMAL(4,2),
-  dia_li DECIMAL(4,2),
-  gdcd DECIMAL(4,2),
-  ma_ngoai_ngu VARCHAR(10),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Subject statistics table
-subject_statistics (
-  id SERIAL PRIMARY KEY,
-  subject_code VARCHAR(20) NOT NULL,
-  subject_name VARCHAR(100) NOT NULL,
-  score_level VARCHAR(20) NOT NULL,
-  min_score DECIMAL(4,2) NOT NULL,
-  max_score DECIMAL(4,2),
-  student_count INTEGER DEFAULT 0,
-  percentage DECIMAL(5,2) DEFAULT 0,
-  calculated_at TIMESTAMP DEFAULT NOW()
-);
+### Enhanced Caching Strategy
+```javascript
+// Cache Configuration
+CACHE_CONFIG = {
+  'statistics/chart': { ttl: 300, vary: [] },           // 5 minutes
+  'statistics/summary': { ttl: 300, vary: [] },         // 5 minutes  
+  'statistics/subject': { ttl: 300, vary: ['subjectCode'] }, // 5 minutes
+  'performance/overview': { ttl: 600, vary: [] },       // 10 minutes
+  'groups': { ttl: 900, vary: ['groupCode', 'limit'] }, // 15 minutes
+  'config': { ttl: 3600, vary: [] },                    // 1 hour
+  'students': { ttl: 1800, vary: ['sbd'] },             // 30 minutes
+  'students/search': { ttl: 600, vary: ['query', 'limit', 'offset'] } // 10 minutes
+}
 ```
 
-### CSV Data Format
+### Microservices Architecture
+- **Service Isolation**: Each service runs independently
+- **Horizontal Scaling**: Services can be scaled individually
+- **Fault Tolerance**: Service failures don't affect other components
+- **Load Balancing**: Built-in Docker load balancing
 
-The system expects CSV files with the following columns:
+### Database Separation
+- **Student Database**: Dedicated PostgreSQL for student data
+- **Report Database**: Separate PostgreSQL for analytics data
+- **Data Isolation**: Enhanced security and performance
 
-```csv
-sbd,toan,ngu_van,ngoai_ngu,vat_li,hoa_hoc,sinh_hoc,lich_su,dia_li,gdcd,ma_ngoai_ngu
-12345678,8.5,7.0,8.0,9.0,7.5,8.0,6.5,7.0,8.5,N1
+## 🌐 Updated API Endpoints
+
+All requests now go through the API Gateway at `http://localhost:3000`
+
+### Student Endpoints (Cached)
 ```
-
-## 🌐 API Endpoints
-
-### Student Service (Port 3001)
-
-```
-GET    /health                           # Health check
+GET    /api/students/:sbd                # Get student by ID (30min cache)
+GET    /api/students/search              # Search students (10min cache)
 GET    /api/students                     # Get all students (paginated)
-GET    /api/students/:sbd                # Get student by ID
-POST   /api/students                     # Create new student
-PUT    /api/students/:sbd                # Update student
-DELETE /api/students/:sbd                # Delete student
-GET    /api/students/subject/:subject/scores  # Get students by subject score
-GET    /api/students/subject/:subject/statistics  # Get subject statistics
-GET    /api/csv/files                    # Get available CSV files
+POST   /api/students                     # Create student (invalidates cache)
+PUT    /api/students/:sbd                # Update student (invalidates cache)
+DELETE /api/students/:sbd                # Delete student (invalidates cache)
+```
+
+### Report Endpoints (Cached)
+```
+GET    /api/reports/statistics/chart     # Chart data (5min cache)
+GET    /api/reports/statistics/summary   # Summary stats (5min cache)
+GET    /api/reports/statistics/subject/:code # Subject stats (5min cache)
+GET    /api/reports/performance/overview # Performance overview (10min cache)
+GET    /api/reports/groups/:code/top-students # Top students (15min cache)
+GET    /api/reports/groups               # Groups config (1hour cache)
+GET    /api/reports/config               # System config (1hour cache)
+```
+
+### CSV Processing Endpoints
+```
+GET    /api/csv/files                    # List CSV files
 POST   /api/csv/process/:filename        # Process CSV file
-GET    /api/csv/validate/:filename       # Validate CSV file
-GET    /api/csv/preview/:filename        # Preview CSV file
+GET    /api/csv/preview/:filename        # Preview CSV content
 ```
 
-### Report Service (Port 3002)
-
+### Cache Management Endpoints
 ```
-GET    /health                           # Health check
-GET    /api/reports/statistics/chart     # Get chart data for all subjects
-GET    /api/reports/statistics/subject/:code  # Get subject statistics
-GET    /api/reports/statistics/summary   # Get comprehensive summary
-GET    /api/reports/performance/overview # Get performance overview
-POST   /api/reports/statistics/calculate # Calculate/update statistics
-POST   /api/reports/initialize          # Initialize report system
-GET    /api/reports/groups              # Get available groups
-GET    /api/reports/groups/:code/top-students  # Get top students by group
-GET    /api/reports/groups/:code/statistics    # Get group statistics
-GET    /api/reports/groups/:code/ranking       # Get group ranking
-POST   /api/reports/groups/compare      # Compare groups
+GET    /cache/stats                      # Cache statistics
+DELETE /cache/clear                      # Clear all cache
+GET    /health                          # System health check
+GET    /status                          # Detailed status
 ```
 
-## 🐳 Docker Setup (Optional)
+## 🔧 Docker Services Configuration
 
-If you prefer to use Docker:
+### Services Overview
+```yaml
+services:
+  api-gateway:      # Port 3000 - Main entry point
+  student-service:  # Port 3001 - Student management
+  report-service:   # Port 3002 - Analytics & reporting
+  csv-service:      # Port 3003 - CSV processing
+  redis-cache:      # Port 6379 - Caching layer
+  postgres:         # Port 5432 - Student database
+  postgres-report:  # Port 5433 - Report database  
+  pgadmin:         # Port 8080 - Database admin
+```
 
+### Volume Management
 ```bash
-cd student-score-microservices
+# List all volumes
+docker volume ls
 
-# Build and start all services
-docker-compose up --build
+# Remove specific volumes for fresh start
+docker volume rm student-score-microservices_redis_data           # Clear cache
+docker volume rm student-score-microservices_postgres_report_data # Clear report DB
+docker volume rm student-score-microservices_postgres_data        # Clear student DB
 
-# Or start in detached mode
-docker-compose up -d --build
+# Complete reset
+docker-compose down -v  # Removes all volumes
+```
 
-# Stop services
+## 📊 Enhanced Features
+
+### Performance Optimizations
+- **Redis Caching**: Sub-second response times for cached data
+- **Connection Pooling**: Optimized database connections
+- **Batch Processing**: Efficient CSV import with configurable batch sizes
+- **Memory Management**: Optimized for large datasets
+
+### Monitoring & Logging
+- **Centralized Logging**: Structured logging across all services
+- **Health Checks**: Real-time service monitoring
+- **Cache Metrics**: Detailed cache hit/miss statistics
+- **Performance Tracking**: Request timing and performance metrics
+
+### Cache Headers
+All cached responses include informative headers:
+```
+X-Cache: HIT|MISS
+X-Cache-Key: api-gateway:reports:statistics/chart
+Cache-Control: public, max-age=300
+```
+
+## 🛠️ Development Commands
+
+### Docker Management
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs (all services)
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f api-gateway
+docker-compose logs -f redis-cache
+
+# Restart specific service
+docker-compose restart api-gateway
+
+# Scale services
+docker-compose up -d --scale report-service=2
+
+# Stop all services
 docker-compose down
 
-# View logs
-docker-compose logs -f
+# Complete cleanup
+docker-compose down -v
+docker system prune -f
 ```
 
-The `docker-compose.yml` includes:
-- PostgreSQL database
-- Student service
-- Report service
-- pgAdmin for database management
-
-## 🧪 Testing
-
-### Running Tests
-
+### Cache Management
 ```bash
-# Student Service tests
-cd student-score-microservices/student-service
-npm test
+# Clear Redis cache
+docker-compose exec redis-cache redis-cli FLUSHALL
 
-# Report Service tests
-cd ../report-service
-npm test
+# View cache keys
+docker-compose exec redis-cache redis-cli KEYS "*"
 
-# Frontend tests
-cd ../../frontend
-npm test
+# Monitor cache activity
+docker-compose exec redis-cache redis-cli MONITOR
+
+# Cache statistics via API
+curl http://localhost:3000/cache/stats
 ```
 
-### Sample Data
+### Database Management
+```bash
+# Access student database
+docker-compose exec postgres psql -U student_user -d scores_student
 
-To test the system with sample data:
+# Access report database  
+docker-compose exec postgres-report psql -U report_user -d scores_report
 
-1. Place a CSV file in `student-score-microservices/student-service/csv-files/`
-2. Set `AUTO_IMPORT_CSV=true` in student service `.env`
-3. Set `CSV_FILENAME=your_file.csv` in student service `.env`
-4. Restart the student service
+# Run migrations
+docker-compose exec student-service npm run migrate
+docker-compose exec report-service npm run migrate
+```
+
+## 🧪 Testing Cache Performance
+
+### Cache Hit Testing
+```bash
+# First request (should be MISS)
+curl -I http://localhost:3000/api/reports/statistics/chart
+
+# Second request (should be HIT)
+curl -I http://localhost:3000/api/reports/statistics/chart
+
+# Check response headers for cache status
+curl -H "Accept: application/json" http://localhost:3000/api/reports/statistics/chart
+```
+
+### Load Testing
+```bash
+# Test concurrent requests
+for i in {1..10}; do
+  curl http://localhost:3000/api/reports/statistics/summary &
+done
+wait
+
+# Monitor cache performance
+curl http://localhost:3000/cache/stats
+```
 
 ## 🔍 Troubleshooting
 
-### Common Issues
+### Common Docker Issues
 
-1. **Database Connection Error**
+1. **Services Not Starting**
+   ```bash
+   # Check service status
+   docker-compose ps
+   
+   # View detailed logs
+   docker-compose logs api-gateway
    ```
-   Error: connect ECONNREFUSED 127.0.0.1:5433
+
+2. **Cache Not Working**
+   ```bash
+   # Check Redis connection
+   docker-compose exec redis-cache redis-cli ping
+   
+   # View cache middleware logs
+   docker-compose logs -f api-gateway | grep -i cache
    ```
-   - Ensure PostgreSQL is running
-   - Check database credentials in `.env` files
-   - Verify database exists
 
-2. **Port Already in Use**
+3. **Database Connection Issues**
+   ```bash
+   # Check database connectivity
+   docker-compose exec postgres pg_isready
+   docker-compose exec postgres-report pg_isready
    ```
-   Error: listen EADDRINUSE :::3001
+
+4. **Port Conflicts**
+   ```bash
+   # Check port usage
+   netstat -tulpn | grep :3000
+   
+   # Modify ports in docker-compose.yml if needed
    ```
-   - Change PORT in `.env` file
-   - Or kill the process using the port
 
-3. **CSV Import Fails**
-   - Check CSV file format matches expected schema
-   - Ensure file permissions allow reading
-   - Check logs for detailed error messages
+### Performance Troubleshooting
 
-4. **Frontend Can't Connect to Backend**
-   - Verify backend services are running
-   - Check CORS configuration
-   - Ensure API URLs are correct
+1. **Slow Response Times**
+   - Check cache hit ratio: `curl http://localhost:3000/cache/stats`
+   - Monitor Redis: `docker-compose exec redis-cache redis-cli INFO stats`
+   - Check service logs for bottlenecks
 
-### Logs
+2. **Memory Issues**
+   - Monitor container memory: `docker stats`
+   - Check Redis memory usage: `docker-compose exec redis-cache redis-cli INFO memory`
 
-Service logs are available in:
-- Student Service: `student-score-microservices/student-service/logs/`
-- Report Service: `student-score-microservices/report-service/logs/`
+3. **Database Performance**
+   - Monitor database connections
+   - Check query performance in logs
+   - Consider adding database indexes
 
-### Database Management
+## 🚀 Production Deployment
 
-Access pgAdmin (if using Docker):
-- URL: `http://localhost:5050`
-- Email: `admin@admin.com`
-- Password: `admin`
+### Environment Variables for Production
+```env
+NODE_ENV=production
+LOG_LEVEL=warn
+REDIS_PASSWORD=your-secure-password
+POSTGRES_PASSWORD=your-secure-password
+API_GATEWAY_CORS_ORIGIN=https://yourdomain.com
+```
 
-## 📈 Performance Optimization
+### Security Considerations
+- Change default passwords in production
+- Enable Redis authentication
+- Use environment-specific configurations
+- Implement proper CORS policies
+- Add rate limiting
+- Enable HTTPS
 
-The system includes several optimizations:
+### Scaling Recommendations
+```yaml
+# Scale services based on load
+services:
+  api-gateway:
+    deploy:
+      replicas: 2
+  report-service:
+    deploy:
+      replicas: 3
+  student-service:
+    deploy:
+      replicas: 2
+```
 
-1. **Database-Level Calculations**: SQL aggregations instead of JavaScript processing
-2. **Memory-Efficient Queries**: Limited result sets for large datasets
-3. **Batch Processing**: CSV import in configurable batch sizes
-4. **Streaming**: Large file processing with streams
-5. **Caching**: Automatic result caching for frequently accessed data
+## 📈 Performance Metrics
 
-## 🛡️ Security Considerations
+### Cache Performance
+- **Cache Hit Ratio**: Target >80% for frequently accessed data
+- **Response Time**: <100ms for cached responses
+- **Memory Usage**: Monitor Redis memory consumption
 
-- Input validation on all endpoints
-- SQL injection prevention with parameterized queries
-- File upload restrictions
-- Environment variable configuration for sensitive data
-- CORS configuration for frontend access
+### Database Performance
+- **Connection Pool**: Optimized for concurrent requests
+- **Query Performance**: Indexed queries for fast retrieval
+- **Batch Processing**: Configurable batch sizes for imports
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Make your changes
+4. Test with Docker: `docker-compose up --build`
+5. Commit your changes (`git commit -m 'Add some amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 👥 Support
-
-For support and questions:
-- Create an issue in the repository
-- Check the troubleshooting section
-- Review the API documentation
-- Check service logs for error details
 
 ## 🔄 Version History
 
 - **v1.0.0**: Initial release with basic student management and reporting
 - **v1.1.0**: Added group performance analysis and optimized queries
 - **v1.2.0**: Enhanced frontend with responsive design and charts
+- **v2.0.0**: 🆕 **Major Release** - Added API Gateway, Redis caching, microservices architecture
+  - API Gateway with intelligent caching
+  - Redis caching layer with automatic invalidation
+  - Separate databases for student and report services
+  - CSV processing microservice
+  - Docker containerization
+  - Enhanced monitoring and logging
+  - Performance optimizations
+
+## 👥 Support
+
+For support and questions:
+- Create an issue in the repository
+- Check the troubleshooting section
+- Review Docker logs: `docker-compose logs -f`
+- Check service health: `curl http://localhost:3000/health`
+- Monitor cache performance: `curl http://localhost:3000/cache/stats`

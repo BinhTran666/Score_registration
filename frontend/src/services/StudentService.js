@@ -1,9 +1,9 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3000/api/students';
 
 export const studentAPI = {
   async getStudentBySbd(sbd) {
     try {
-      const response = await fetch(`${API_BASE_URL}/students/${sbd}`);
+      const response = await fetch(`${API_BASE_URL}/${sbd}`);
       if (!response.ok) {
         throw new Error(`Student not found: ${response.status}`);
       }

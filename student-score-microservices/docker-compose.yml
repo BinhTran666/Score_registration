@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database for student servie
   postgres:
     image: postgres:16-alpine
     container_name: ${POSTGRES_CONTAINER_NAME}
@@ -20,6 +18,29 @@ services:
       - ${NETWORK_NAME}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -p 5433"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Database for Report Service 
+  postgres-report:
+    image: postgres:16-alpine
+    container_name: ${POSTGRES_REPORT_CONTAINER_NAME:-postgres-report}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_REPORT_DB:-scores_report}
+      POSTGRES_USER: ${POSTGRES_REPORT_USER:-report_user}
+      POSTGRES_PASSWORD: ${POSTGRES_REPORT_PASSWORD:-report_password_2024}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      PGPORT: 5434
+    ports:
+      - "5434:5434"  
+    volumes:
+      - postgres_report_data:/var/lib/postgresql/data/pgdata
+    networks:
+      - ${NETWORK_NAME}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_REPORT_USER:-report_user} -d ${POSTGRES_REPORT_DB:-scores_report} -p 5434"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -84,26 +105,38 @@ services:
       NODE_ENV: ${NODE_ENV}
       PORT: ${REPORT_SERVICE_PORT}
       SERVICE_NAME: report-service
-      DB_HOST: ${DB_HOST}
-      DB_PORT: 5433
-      DB_NAME: ${POSTGRES_DB}
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # ✅ CHANGE TO REPORT DATABASE (port 5434)
+      DB_HOST: postgres-report
+      DB_PORT: 5434
+      DB_NAME: ${POSTGRES_REPORT_DB:-scores_report}
+      DB_USER: ${POSTGRES_REPORT_USER:-report_user}
+      DB_PASSWORD: ${POSTGRES_REPORT_PASSWORD:-report_password_2024}
+      # ✅ ADD CSV CONFIGURATION
+      AUTO_IMPORT_CSV: ${REPORT_AUTO_IMPORT_CSV:-true}
+      CSV_FILENAME: ${REPORT_CSV_FILENAME:-diem_thi_thpt_2024.csv}
+      CSV_TEST_MODE: ${REPORT_CSV_TEST_MODE:-true}
+      CSV_TEST_LINES: ${REPORT_CSV_TEST_LINES:-10000}
+      CSV_STREAM_PROCESSING: ${REPORT_CSV_STREAM_PROCESSING:-true}
+      CSV_BATCH_SIZE: ${REPORT_CSV_BATCH_SIZE:-500}
+      MAX_FILE_SIZE: ${REPORT_MAX_FILE_SIZE:-100mb}
       LOG_LEVEL: ${LOG_LEVEL}
       ENABLE_CRON: ${REPORT_ENABLE_CRON:-false}
       AUTO_INITIALIZE: true
       REPORT_BATCH_SIZE: ${REPORT_BATCH_SIZE:-1000}
       CACHE_TTL: ${REPORT_CACHE_TTL:-3600}
+      NODE_OPTIONS: "--max-old-space-size=${REPORT_NODE_MAX_MEMORY:-4096} --expose-gc"
+      UV_THREADPOOL_SIZE: ${REPORT_UV_THREADPOOL_SIZE:-8}
     ports:
       - "${REPORT_SERVICE_PORT}:${REPORT_SERVICE_PORT}"
     volumes:
       - ./report-service/src:/app/src
       - ./report-service/logs:/app/logs
       - ./report-service/migrations:/app/migrations
+      - ./report-service/csv-files:/app/csv-files  # ✅ ADD CSV FILES VOLUME
     networks:
       - ${NETWORK_NAME}
     depends_on:
-      postgres:
+      postgres-report:  # ✅ CHANGE TO REPORT DATABASE
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${REPORT_SERVICE_PORT}/health"]
@@ -114,20 +147,93 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 6G  # ✅ INCREASE MEMORY FOR CSV PROCESSING
         reservations:
-          memory: 512M
+          memory: 2G
     command: >
       sh -c "
         echo '📊 Running report service migrations...' &&
-        yarn migrate:latest &&
-        echo '📈 Starting Report Service with smart initialization...' &&
-        yarn start
+        npx knex migrate:latest &&
+        echo '📈 Starting Report Service with CSV import capability...' &&
+        node --max-old-space-size=${REPORT_NODE_MAX_MEMORY:-4096} --expose-gc src/app.js
       "
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: ${API_GATEWAY_CONTAINER_NAME:-api-gateway}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${API_GATEWAY_PORT:-3000}
+      STUDENT_SERVICE_URL: http://student-service:${SERVICE_PORT}
+      REPORT_SERVICE_URL: http://report-service:${REPORT_SERVICE_PORT}
+      LOG_LEVEL: ${LOG_LEVEL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:8080}
+      
+      # Redis Configuration
+      REDIS_HOST: redis-cache
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: 0
+      CACHE_TTL: 300
+      
+      HEALTH_CHECK_INTERVAL: 30000
+      SERVICE_TIMEOUT: 5000
+      RATE_LIMIT_WINDOW_MS: 900000
+      RATE_LIMIT_MAX_REQUESTS: 100
+    ports:
+      - "${API_GATEWAY_PORT:-3000}:${API_GATEWAY_PORT:-3000}"
+    volumes:
+      - ./api-gateway/src:/app/src
+      - ./api-gateway/logs:/app/logs
+    networks:
+      - ${NETWORK_NAME}
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      # Uncomment when services are ready
+      # student-service:
+      #   condition: service_healthy
+      # report-service:
+      #   condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Redis Cache for API Gateway
+  redis-cache:
+    image: redis:7-alpine
+    container_name: ${REDIS_CONTAINER_NAME:-redis-cache}
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ${NETWORK_NAME}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
 
   # PgAdmin for database management
   pgadmin:
-    image: dpage/pgadmin4:8
+    image: dpage/pgadmin4:latest
     container_name: ${PGADMIN_CONTAINER_NAME}
     restart: unless-stopped
     environment:
@@ -147,7 +253,11 @@ services:
 volumes:
   postgres_data:
     driver: local
+  postgres_report_data:
+    driver: local  
   pgadmin_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:
