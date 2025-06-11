@@ -1,10 +1,10 @@
-const API_BASE_URL = "http://localhost:3002/api";
+const API_BASE_URL = "http://localhost:3000/api/reports";
 
 export const reportAPI = {
   // Get statistics chart data for all subjects
   async getStatisticsChart() {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/statistics/chart`);
+      const response = await fetch(`${API_BASE_URL}/statistics/chart`);
       if (!response.ok) {
         throw new Error(`Failed to fetch chart data: ${response.status}`);
       }
@@ -18,7 +18,7 @@ export const reportAPI = {
   async getSubjectStatistics(subjectCode) {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/reports/statistics/subject/${subjectCode}`
+        `${API_BASE_URL}/statistics/subject/${subjectCode}`
       );
       if (!response.ok) {
         throw new Error(
@@ -35,7 +35,7 @@ export const reportAPI = {
   async getStatisticsSummary() {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/reports/statistics/summary`
+        `${API_BASE_URL}/statistics/summary`
       );
       if (!response.ok) {
         throw new Error(
@@ -52,7 +52,7 @@ export const reportAPI = {
   async getPerformanceOverview() {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/reports/performance/overview`
+        `${API_BASE_URL}/performance/overview`
       );
       if (!response.ok) {
         throw new Error(
@@ -69,7 +69,7 @@ export const reportAPI = {
   async calculateStatistics() {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/reports/statistics/calculate`,
+        `${API_BASE_URL}/statistics/calculate`,
         {
           method: "POST",
           headers: {
@@ -89,7 +89,7 @@ export const reportAPI = {
   // Initialize the report system
   async initializeReports() {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/initialize`, {
+      const response = await fetch(`${API_BASE_URL}/initialize`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -107,7 +107,7 @@ export const reportAPI = {
   // Get service health check with detailed information
   async getDetailedHealth() {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/health/detailed`);
+      const response = await fetch(`${API_BASE_URL}/health/detailed`);
       if (!response.ok) {
         throw new Error(`Failed to fetch health status: ${response.status}`);
       }
@@ -120,7 +120,7 @@ export const reportAPI = {
   // Get available subjects and score levels configuration
   async getConfig() {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/config`);
+      const response = await fetch(`${API_BASE_URL}/config`);
       if (!response.ok) {
         throw new Error(`Failed to fetch configuration: ${response.status}`);
       }
@@ -133,7 +133,7 @@ export const reportAPI = {
   async getTopStudentsByGroup(groupCode = "A", limit = 10) {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/reports/groups/${groupCode}/top-students?limit=${limit}`
+        `${API_BASE_URL}/groups/${groupCode}/top-students?limit=${limit}`
       );
       if (!response.ok) {
         throw new Error(
@@ -149,7 +149,7 @@ export const reportAPI = {
   },
   async getGroupsConfig() {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports/groups`);
+      const response = await fetch(`${API_BASE_URL}/groups`);
       if (!response.ok) {
         throw new Error(`Failed to fetch groups config: ${response.status}`);
       }
